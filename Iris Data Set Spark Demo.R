@@ -1,7 +1,3 @@
-
-
-
-
 Sys.setenv(SPARK_HOME = "/usr/local/spark-2.4.0-bin-hadoop2.7")
 
 
@@ -11,8 +7,6 @@ Sys.setenv(SPARK_HOME = "/usr/local/spark-2.4.0-bin-hadoop2.7")
 # install.packages("e1071")
 # install.packages("ggplot2")
 # devtools::install_github("rstudio/sparklyr")
-
-# https://dplyr.tidyverse.org
 
 
 library(sparklyr)
@@ -28,12 +22,11 @@ conf$spark.driver.memory <- "4GB"
 conf$spark.dynamicAllocation.enabled <- "false"
 
 
-
-
 sc <- spark_connect(master="spark://193.224.59.115:7077", 
                     version = "2.4.0",
                     app_name = "SparklyR-Nov17-LiveDemo",
                     config = conf)
+
 
 
 ## Spark Web User Interface
@@ -41,13 +34,7 @@ spark_web(sc)
 ## spark_log(sc)
 
 
-# irisDF = spark_read_csv(sc, "irisDataSet", "hdfs://193.224.59.115:9000/input/irisDataSet.csv", header = TRUE, infer_schema = TRUE)
-# irisDF = spark_read_csv(sc, "irisDataSet7", "hdfs://193.224.59.115:9000/input/irisDataSet7.csv", header = TRUE, infer_schema = TRUE, repartition = 20)
-# irisDF = spark_read_csv(sc, "irisDataSet464", "hdfs://193.224.59.115:9000/input/irisDataSet464.csv", memory = TRUE, header = TRUE, infer_schema = TRUE, repartition = 20)
-# irisDF = spark_read_csv(sc, "irisDataSet3327", "hdfs://193.224.59.115:9000/input/irisDataSet3327.csv", memory = TRUE, header = TRUE, infer_schema = TRUE, repartition = 20)
-
-
-## 18 mp - irisDataSet464 - 464Mb - 19 millió sor
+## ~18 sec - irisDataSet464 - 550Mb - 20 million lines
 irisDF = spark_read_csv(sc,
                         "irisDataSet",
                         "hdfs://193.224.59.115:9000/input/irisDataSet464Random.csv",
@@ -55,16 +42,16 @@ irisDF = spark_read_csv(sc,
                         infer_schema = TRUE,
                         repartition = 28)
 
-
 ## Number of Partitions
 sdf_num_partitions(irisDF)
 
 
 ## Repartition
 irisDF <- sdf_repartition(irisDF, 80)
+#80 VCPU: this is the optimal for our cluster
 
 
-## Number of rows
+## Number of rows ~ 20 million lines
 sdf_nrow(irisDF)
 
 
@@ -74,9 +61,6 @@ src_tbls(sc)
 
 ## Iris data (dataFrame)
 head(irisDF)
-mode(irisDF)
-names(irisDF)
-
 
 ## Example for select dplyr
 sepal_lengthDF = select(irisDF, sepal_length)
@@ -107,7 +91,7 @@ head(special_selected_irisDF)
 ## Example mutate
 mutate_irisDF <- irisDF %>%
   mutate(species, ratio = sepal_length / sepal_width) %>%
-  select(species:sepal_length, ratio)
+  select(species:sepal_length, sepal_width, ratio)
 
 head(mutate_irisDF)
 
@@ -132,9 +116,7 @@ head(groupby_irisDF)
 
 ## End of dplyr examples
 
-
-
-
+##---------------------------------------------------starts here
 ## Split data
 partitions <- irisDF %>%
   sdf_partition(training = 0.7, test = 0.3, seed = 1111)
@@ -150,21 +132,17 @@ iris_test <- partitions$test
 
 ## Machine learing part <--------------------------
 
-## Model - kb 27 másodperc
+## Model - ~ 27 sec
 dt_model <- iris_training %>%
   ml_decision_tree(species ~ ., max_depth = 2)
 
-## List
-mode(dt_model)
-
-## Pipeline model utálom
-names(dt_model)
-
 ## Prediction
-pred <- sdf_predict(iris_test, dt_model)
+pred_train <- sdf_predict(iris_training, dt_model)
+pred_test <- sdf_predict(iris_test, dt_model)
 
 ## Evaluation
-ml_multiclass_classification_evaluator(pred)
+ml_multiclass_classification_evaluator(pred_train)
+ml_multiclass_classification_evaluator(pred_test)
 
 ## Number of rows
 sdf_nrow(pred)
@@ -198,22 +176,11 @@ table(sdf$species, sdf$predicted_label)
 ml_tree_feature_importance(dt_model)
 
 
-## Evaluation
+## Evaluation - on the original dataset ~20 million lines
 ml_multiclass_classification_evaluator(pred, metric_name = "accuracy")
 
 
-## ToDo <---------------------------------------------- confusion matrix
-
-tmp_df <- cbind(sdf$species, sdf$predicted_label)
-df <- as.data.frame(tmp_df)
-str(df)
-
-## Caret solution
-confusionMatrix(data = df$V1, reference = df$V2)
-
-
-
-## ToDo <---------------------------------------------- other machine learning models
+## ---------------------- other machine learning models
 
 # We can use the same formula for every models
 ml_formula <- formula(species ~ sepal_length + sepal_width + petal_length + petal_width)
@@ -227,14 +194,10 @@ ml_dt <- ml_decision_tree(iris_training, ml_formula, max_depth = 3)
 # Random Forest
 ml_rf <- ml_random_forest(iris_training, ml_formula, max_depth = 2, subsampling_rate = 0.001)
 
-# Neural Network
-ml_nn <- ml_multilayer_perceptron_classifier(iris_training, ml_formula, layers = c(4,15,3), max_iter = 20)
+# Neural Network - 4 variables, 15 node number in a layer, 3 number of classes
+ml_nn <- ml_multilayer_perceptron_classifier(iris_training, ml_formula, layers = c(4,15,3), max_iter = 10)
 
 
-## ToDo <---------------------------------------------- next
-
-## Pipeline model utálom
-names(ml_nn)
 
 ## Predictions
 pred_lr <- sdf_predict(iris_test, ml_lr)
