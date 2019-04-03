@@ -239,7 +239,7 @@ ggplot(iris_summary, aes(sepal_width, sepal_length, color = species)) +
 ## Close Spark Connection <---------------------------- close spark session
 
 ## Close Spark Connection
-spark_disconnect(sc)
+spark_disconnect(sc) 
 
 ## ToDo <---------------------------------------------- session info
 
