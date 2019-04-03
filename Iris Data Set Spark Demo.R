@@ -144,8 +144,19 @@ pred_test <- sdf_predict(iris_test, dt_model)
 ml_multiclass_classification_evaluator(pred_train)
 ml_multiclass_classification_evaluator(pred_test)
 
-## Number of rows
-sdf_nrow(pred)
+
+# Show Decision Tree Rules
+spark_jobj(dt_model$model) %>% invoke(., "toDebugString") %>% cat()
+
+## We can save our trained model 'dt_model'
+ml_save(dt_model, "hdfs://192.168.0.60:9000/input/dt_model", overwrite = T)
+
+## Later we can load and use this traind model
+loaded_model = ml_load(sc, "hdfs://192.168.0.60:9000/input/dt_model")
+
+# pred_based_on_loaded_model = pred_test <- sdf_predict(iris_test, loaded_model)
+# ml_multiclass_classification_evaluator(pred_based_on_loaded_model)
+
 
 
 
@@ -153,7 +164,7 @@ sdf_nrow(pred)
 
 ## <---------------------------------------------- downsampling
 
-sampleDataFrame = sample_frac(pred, 0.0001)
+sampleDataFrame = sample_frac(pred_test, 0.0001)
 
 head(sampleDataFrame)
 
@@ -177,7 +188,7 @@ ml_tree_feature_importance(dt_model)
 
 
 ## Evaluation - on the original dataset ~20 million lines
-ml_multiclass_classification_evaluator(pred, metric_name = "accuracy")
+ml_multiclass_classification_evaluator(pred_test, metric_name = "accuracy")
 
 
 ## ---------------------- other machine learning models
@@ -186,7 +197,7 @@ ml_multiclass_classification_evaluator(pred, metric_name = "accuracy")
 ml_formula <- formula(species ~ sepal_length + sepal_width + petal_length + petal_width)
 
 # Logistic Regression
-ml_lr <- ml_logistic_regression(iris_training, ml_formula, max_iter = 2)
+ml_lr <- ml_logistic_regression(iris_training, ml_formula, max_iter = 3, tol = 1e-02)
 
 # Decision Tree
 ml_dt <- ml_decision_tree(iris_training, ml_formula, max_depth = 3)
@@ -194,8 +205,8 @@ ml_dt <- ml_decision_tree(iris_training, ml_formula, max_depth = 3)
 # Random Forest
 ml_rf <- ml_random_forest(iris_training, ml_formula, max_depth = 2, subsampling_rate = 0.001)
 
-# Neural Network - 4 variables, 15 node number in a layer, 3 number of classes
-ml_nn <- ml_multilayer_perceptron_classifier(iris_training, ml_formula, layers = c(4,15,3), max_iter = 10)
+# Neural Network - 4 variables, 15 node number in a layer, 3 number of classes (20 iter takes 60 sec)
+ml_nn <- ml_multilayer_perceptron_classifier(iris_training, ml_formula, layers = c(4,15,3), max_iter = 20) # Play around with max_iter
 
 
 
@@ -205,7 +216,7 @@ pred_dt <- sdf_predict(iris_test, ml_dt)
 pred_rf <- sdf_predict(iris_test, ml_rf)
 pred_nn <- sdf_predict(iris_test, ml_nn)
 
-## Evaluation
+## Evaluation (8 sec per model)
 ml_multiclass_classification_evaluator(pred_lr)
 ml_multiclass_classification_evaluator(pred_dt)
 ml_multiclass_classification_evaluator(pred_rf)
