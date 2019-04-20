@@ -2,6 +2,8 @@
 # install.packages("plot3D")
 # install.packages("plot3Drgl")
 # install.packages("rgl")
+# install.packages("car")
+
 
 download.file('http://www.pintye.com/300XValtozo1YCSV_pontosvesszovel_tagolt.csv', 'adat.csv')
 
@@ -102,12 +104,17 @@ hist3D_fancy(df$y, df$x1, colvar=df$x2,
              breaks =30)
 
 # Create his3D using plot3D
-hist3D_fancy(iris$Sepal.Length, iris$Petal.Width, colvar=as.numeric(iris$Species))
+hist3D_fancy(df$y, df$x1, colvar=as.numeric(df$x2))
 # Make the rgl version
 library("plot3Drgl")
 plotrgl()
 
 
+library(car)
+library(rgl, pos=4)
+library(mgcv, pos=4)
+scatter3d(df$y, df$x1, df$x2, fit="linear", residuals=TRUE, bg="black", axis.scales=TRUE, grid=TRUE, ellipsoid=FALSE, xlab="Petal.W..Setosa", ylab="Petal.L..Setosa", zlab="Sepal.L..Setosa")
+scatter3d(df$y, df$x1, df$x2, fit="linear", residuals=TRUE, bg="white", axis.scales=TRUE, grid=TRUE, ellipsoid=FALSE, xlab="Petal.L..Versicolor", ylab="Petal.L..Setosa", zlab="Petal.L..Virginica")
 
 
 
